@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+
+{% block title %}Encode Image - Steganography App{% endblock %}
+
+{% block content %}
+<div class="form-container">
+    <h2>🖼️ Encode Image</h2>
+    <p>Hide your secret message inside an image</p>
+    
+    <form method="post" enctype="multipart/form-data" class="stego-form">
+        {% csrf_token %}
+        
+        <div class="form-group">
+            {{ form.image.label_tag }}
+            {{ form.image }}
+            {% if form.image.errors %}
+                <div class="error">{{ form.image.errors }}</div>
+            {% endif %}
+        </div>
+        
+        <div class="form-group">
+            {{ form.message.label_tag }}
+            {{ form.message }}
+            <small>Maximum 5000 characters</small>
+            {% if form.message.errors %}
+                <div class="error">{{ form.message.errors }}</div>
+            {% endif %}
+        </div>
+        
+        <div class="form-group">
+            {{ form.secret_key.label_tag }}
+            {{ form.secret_key }}
+            <small>Minimum 8 characters. Share this key with recipient to decode.</small>
+            {% if form.secret_key.errors %}
+                <div class="error">{{ form.secret_key.errors }}</div>
+            {% endif %}
+        </div>
+        
+        <button type="submit" class="btn btn-primary">Encode Image</button>
+    </form>
+</div>
+{% endblock %}

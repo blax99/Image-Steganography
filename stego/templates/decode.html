@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+
+{% block title %}Decode Image - Steganography App{% endblock %}
+
+{% block content %}
+<div class="form-container">
+    <h2>🔓 Decode Image</h2>
+    <p>Extract the hidden message from an encoded image</p>
+    
+    <form method="post" enctype="multipart/form-data" class="stego-form">
+        {% csrf_token %}
+        
+        <div class="form-group">
+            {{ form.image.label_tag }}
+            {{ form.image }}
+            {% if form.image.errors %}
+                <div class="error">{{ form.image.errors }}</div>
+            {% endif %}
+        </div>
+        
+        <div class="form-group">
+            {{ form.secret_key.label_tag }}
+            {{ form.secret_key }}
+            <small>Enter the secret key used to encode the image</small>
+            {% if form.secret_key.errors %}
+                <div class="error">{{ form.secret_key.errors }}</div>
+            {% endif %}
+        </div>
+        
+        <button type="submit" class="btn btn-primary">Decode Image</button>
+    </form>
+    
+    {% if success %}
+        <div class="decoded-message">
+            <h3>✅ Message Decoded Successfully!</h3>
+            <div class="message-box">
+                {{ decoded_message }}
+            </div>
+            <button class="btn btn-secondary" onclick="copyToClipboard()">Copy Message</button>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

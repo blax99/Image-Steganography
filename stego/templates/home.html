@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+
+{% block title %}Home - Steganography App{% endblock %}
+
+{% block content %}
+<div class="home-page">
+    <h2>Welcome, {{ user.username }}! 👋</h2>
+    <p>Hide secret messages inside images using military-grade encryption.</p>
+    
+    <div class="action-cards">
+        <div class="card">
+            <h3>🖼️ Encode Image</h3>
+            <p>Hide a secret message inside an image with AES-256 encryption.</p>
+            <a href="{% url 'encode' %}" class="btn btn-primary">Start Encoding</a>
+        </div>
+        
+        <div class="card">
+            <h3>🔓 Decode Image</h3>
+            <p>Extract and decrypt a hidden message from an encoded image.</p>
+            <a href="{% url 'decode' %}" class="btn btn-primary">Start Decoding</a>
+        </div>
+    </div>
+    
+    <div class="info-section">
+        <h3>How it works?</h3>
+        <ul>
+            <li><strong>Encryption:</strong> Your message is encrypted using AES-256 encryption with your secret key.</li>
+            <li><strong>Steganography:</strong> The encrypted message is hidden inside the image using LSB (Least Significant Bit) technique.</li>
+            <li><strong>Security:</strong> Only someone with the correct secret key can decrypt and read the message.</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
