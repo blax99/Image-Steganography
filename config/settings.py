@@ -5,9 +5,9 @@ import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = config('SECRET_KEY', default='django-insecure-your-secret-key-change-in-production')
+SECRET_KEY = config('SECRET_KEY')
 
-DEBUG = os.environ.get("DEBUG") == "True"
+DEBUG = config("DEBUG") == "True"
 
 ALLOWED_HOSTS = ['*']
 
@@ -57,7 +57,7 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 DATABASES = {
     "default": dj_database_url.parse(
-        os.environ.get("DATABASE_URL")
+        config("DATABASE_URL")
     )
 }
 
