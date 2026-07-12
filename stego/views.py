@@ -2,14 +2,15 @@ from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import HttpResponse
-from django.core.paginator import Paginator
 from .forms import EncodeForm, DecodeForm
 from .models import StegoOperation
-from . import utils
+from encryption import SteganographyService
 import io
 import os
 import tempfile
-from pathlib import Path
+import uuid
+
+service = SteganographyService()
 
 def get_client_ip(request):
     x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
@@ -20,9 +21,20 @@ def get_client_ip(request):
     return ip
 
 def get_temp_path(filename):
-    """Get cross-platform temporary file path"""
+    """Get cross-platform temporary file path."""
     temp_dir = tempfile.gettempdir()
     return os.path.join(temp_dir, filename)
+
+
+def save_uploaded_image(uploaded_file):
+    """Persist an uploaded image to disk and return its temporary path."""
+    unique_filename = f"{uuid.uuid4()}_{uploaded_file.name}"
+    image_path = get_temp_path(unique_filename)
+    with open(image_path, 'wb') as handle:
+        for chunk in uploaded_file.chunks():
+            handle.write(chunk)
+    return image_path
+
 
 @login_required(login_url='login')
 def home(request):
@@ -43,26 +55,13 @@ def encode_image(request):
                 message = form.cleaned_data['message']
                 secret_key = form.cleaned_data['secret_key']
                 
-                # Create unique filename to avoid conflicts
-                import uuid
-                unique_filename = f"{uuid.uuid4()}_{image.name}"
-                image_path = get_temp_path(unique_filename)
-                
-                # Save uploaded image to temp directory
-                with open(image_path, 'wb') as f:
-                    for chunk in image.chunks():
-                        f.write(chunk)
-                
-                # Encrypt and hide message in image
-                encrypted_message = utils.encrypt_message(message, secret_key)
-                stego_image = utils.hide_message_in_image(image_path, encrypted_message)
-                
-                # Save encoded image to bytes
-                output = io.BytesIO()
-                stego_image.save(output, format='PNG')
-                output.seek(0)
-                
-                # Log operation to database
+                image_path = save_uploaded_image(image)
+                output_path = get_temp_path(f"{uuid.uuid4().hex}.png")
+                service.encode_message(message, secret_key, image_path, output_path)
+
+                with open(output_path, 'rb') as handle:
+                    payload = handle.read()
+
                 StegoOperation.objects.create(
                     user=request.user,
                     operation_type='encode',
@@ -71,19 +70,18 @@ def encode_image(request):
                     status='success',
                     ip_address=get_client_ip(request)
                 )
-                
-                # Clean up temp file
+
                 try:
                     if os.path.exists(image_path):
                         os.remove(image_path)
+                    if os.path.exists(output_path):
+                        os.remove(output_path)
                 except Exception as cleanup_error:
                     print(f"Cleanup warning: {cleanup_error}")
-                
-                # Return encoded image as download
-                response = HttpResponse(output.getvalue(), content_type='image/png')
+
+                response = HttpResponse(payload, content_type='image/png')
                 response['Content-Disposition'] = 'attachment; filename="encoded_image.png"'
                 messages.success(request, 'Image encoded successfully! Download started.')
-                
                 return response
             
             except Exception as e:
@@ -122,52 +120,43 @@ def decode_image(request):
                 image = request.FILES['image']
                 secret_key = form.cleaned_data['secret_key']
                 
-                # Create unique filename to avoid conflicts
-                import uuid
-                unique_filename = f"{uuid.uuid4()}_{image.name}"
-                image_path = get_temp_path(unique_filename)
-                
-                # Save uploaded image to temp directory
-                with open(image_path, 'wb') as f:
-                    for chunk in image.chunks():
-                        f.write(chunk)
-                
-                # Extract and decrypt message from image
-                encrypted_message = utils.extract_message_from_image(image_path)
-                decrypted_message = utils.decrypt_message(encrypted_message, secret_key)
-                
-                # Clean up temp file
+                image_path = save_uploaded_image(image)
+                try:
+                    decoded_message = service.decode_message(image_path, secret_key)
+                except Exception as decoding_error:
+                    decoded_message = None
+                    error_message = str(decoding_error)
+                else:
+                    error_message = None
+
                 try:
                     if os.path.exists(image_path):
                         os.remove(image_path)
                 except Exception as cleanup_error:
                     print(f"Cleanup warning: {cleanup_error}")
-                
-                if decrypted_message is None:
-                    # Log failed decode operation
+
+                if decoded_message is None:
                     StegoOperation.objects.create(
                         user=request.user,
                         operation_type='decode',
                         original_filename=image.name,
                         status='error',
-                        error_message='Invalid secret key or corrupted image',
+                        error_message=error_message or 'Invalid secret key or corrupted image',
                         ip_address=get_client_ip(request)
                     )
                     messages.error(request, 'Invalid secret key or corrupted image.')
                 else:
-                    # Log successful decode operation
                     StegoOperation.objects.create(
                         user=request.user,
                         operation_type='decode',
                         original_filename=image.name,
-                        message_length=len(decrypted_message),
+                        message_length=len(decoded_message),
                         status='success',
                         ip_address=get_client_ip(request)
                     )
-                    
                     return render(request, 'decode.html', {
                         'form': form,
-                        'decoded_message': decrypted_message,
+                        'decoded_message': decoded_message,
                         'success': True
                     })
             
